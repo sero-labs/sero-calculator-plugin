@@ -17,7 +17,7 @@ import { Text } from '@mariozechner/pi-tui';
 import { Type } from 'typebox';
 
 import type { CalcState, HistoryEntry } from '../shared/types';
-import { DEFAULT_CALC_STATE } from '../shared/types';
+import { DEFAULT_CALC_STATE, normalizeCalcState } from '../shared/types';
 
 // ── State file path ────────────────────────────────────────────
 
@@ -41,7 +41,7 @@ function resolveStatePath(cwd: string): string {
 async function readState(filePath: string): Promise<CalcState> {
   try {
     const raw = await fs.readFile(filePath, 'utf8');
-    return JSON.parse(raw) as CalcState;
+    return normalizeCalcState(JSON.parse(raw));
   } catch {
     return { ...DEFAULT_CALC_STATE };
   }

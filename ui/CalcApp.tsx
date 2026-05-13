@@ -9,14 +9,15 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAppState } from '@sero-ai/app-runtime';
 import { cn } from './lib/utils';
 import type { CalcState, HistoryEntry } from '../shared/types';
-import { DEFAULT_CALC_STATE } from '../shared/types';
+import { DEFAULT_CALC_STATE, normalizeCalcState } from '../shared/types';
 import { evaluate, formatDisplay, getDisplaySizeClass } from './calc-engine';
 import './styles.css';
 
 // ── CalcApp ──────────────────────────────────────────────────
 
 export function CalcApp() {
-  const [state, updateState] = useAppState<CalcState>(DEFAULT_CALC_STATE);
+  const [rawState, updateState] = useAppState<CalcState>(DEFAULT_CALC_STATE);
+  const state = normalizeCalcState(rawState);
   const [currentValue, setCurrentValue] = useState('0');
   const [expression, setExpression] = useState('');
   const [shouldResetNext, setShouldResetNext] = useState(false);
