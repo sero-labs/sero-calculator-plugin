@@ -1,6 +1,6 @@
 {
   "name": "@sero-ai/plugin-calc",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Modern calculator app for Sero — Pi extension with web UI",
   "keywords": [
     "pi-package"
