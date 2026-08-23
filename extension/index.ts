@@ -15,6 +15,7 @@ import { StringEnum } from '@earendil-works/pi-ai';
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { Text } from '@earendil-works/pi-tui';
 import { Type } from 'typebox';
+import { withStateLock } from '@sero-ai/extension-runtime';
 
 import type { CalcState, HistoryEntry } from '../shared/types';
 import { DEFAULT_CALC_STATE, normalizeCalcState } from '../shared/types';
@@ -120,31 +121,36 @@ export default function (pi: ExtensionAPI) {
       }
       statePath = resolvedPath;
 
-      const state = await readState(statePath);
-
       switch (params.action) {
         case 'evaluate': {
-          if (!params.expression) {
+          const expression = params.expression;
+          if (!expression) {
             return {
               content: [{ type: 'text', text: 'Error: expression is required' }],
               details: {},
             };
           }
           try {
-            const result = safeEval(params.expression);
-            const entry: HistoryEntry = {
-              id: state.nextId,
-              expression: params.expression,
-              result,
-              createdAt: new Date().toISOString(),
-            };
-            state.history.unshift(entry);
-            state.nextId++;
-            state.display = result;
-            state.expression = params.expression;
-            await writeState(statePath, state);
+            const result = safeEval(expression);
+            // Read+write under the shared `<stateFile>.lock` mutex so this
+            // cannot interleave with the Sero host writing the same file for
+            // the UI (#428).
+            await withStateLock(statePath, async () => {
+              const state = await readState(statePath);
+              const entry: HistoryEntry = {
+                id: state.nextId,
+                expression,
+                result,
+                createdAt: new Date().toISOString(),
+              };
+              state.history.unshift(entry);
+              state.nextId++;
+              state.display = result;
+              state.expression = expression;
+              await writeState(statePath, state);
+            });
             return {
-              content: [{ type: 'text', text: `${params.expression} = ${result}` }],
+              content: [{ type: 'text', text: `${expression} = ${result}` }],
               details: {},
             };
           } catch (err) {
@@ -157,6 +163,7 @@ export default function (pi: ExtensionAPI) {
         }
 
         case 'history': {
+          const state = await readState(statePath);
           if (state.history.length === 0) {
             return {
               content: [{ type: 'text', text: 'No calculation history.' }],
@@ -171,7 +178,8 @@ export default function (pi: ExtensionAPI) {
         }
 
         case 'clear': {
-          await writeState(statePath, { ...DEFAULT_CALC_STATE });
+          // Every writer of the state file must hold the same lock (#428).
+          await withStateLock(statePath, () => writeState(statePath, { ...DEFAULT_CALC_STATE }));
           return {
             content: [{ type: 'text', text: 'Calculator cleared.' }],
             details: {},
